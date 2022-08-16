@@ -22,9 +22,9 @@ This document is meant to guide you through a simple deployment of Storage Inven
   - `fenwick` - incremental metadata synchronization between the _Storage site_ and _Global site_.  Only compares artifacts since the last run.  
   - `ratik` - full metadata validation between the _Storage site_ and _Global site_.
   - `ringhold` - metadata validation after a site policy change.  Subtle difference with above.
-  - `critwall` - file synchronization.  If metadata synchronization (`fenwick`, `ratik`) results in aritfacts at a site without the files, critwall will negotiate the file transfers with the _Global site raven_ service.
+  - `critwall` - file synchronization.  If metadata synchronization (`fenwick`, `ratik`) results in aritfacts at a site without the associated files, critwall will negotiate the file transfers with the _Global site raven_ service.
 
-- a _Global site_ maintains a view of the inventory of all configured _Storage sites_.  _Storage sites_ do not know about other _Storage sites_: if two _Storage sites_ are meant to be kept in sync, they will query the _Global site_ for files that they are missing but which are located elsewhere.
+- a _Global site_ maintains a view of the inventory of all configured _Storage sites_.  _Storage sites_ do not know about other _Storage sites_: if two _Storage sites_ are meant to be kept in sync, they will query the _Global site_ for files that they are missing.
   
   A _Global site_ runs three services:
   - `raven` - file transfer negotiation.  A request for a file through `raven` will not deliver the bytes of the file, but rather a redirect to the `minoc` service at a _Storage site_ that has the requested file.
@@ -64,7 +64,7 @@ This document is meant to guide you through a simple deployment of Storage Inven
 Services and applications use x509 proxy certificates for authorization and authentication.  
 - *Applications* (critwall, fenwick, ratik, ringhold, tantar) will require credentials for a user that has
   been granted permissions to access files by a grant provider (e.g. baldur). This user doesn't make privileged calls and has no access to the actual storage or to other credentials.
-- *Services* (baldur, luskan, minoc, raven) will require credentials that allow privileged operations on behalf of a user (e.g. minoc checking baldur if a particular user is allowed to download a file, baldur checking group membership against a group management service).
+- *Services* (baldur, luskan, minoc, raven) will require credentials that allow privileged operations on behalf of a user (e.g. minoc checking baldur if a particular user is allowed to download a file, baldur checking group membership against a group management service). Currently, this privileged account is one that needs to be recognized by the CADC services.
 - services and applications both expect the above credentials to be provided as an x509 proxy certificate presented in the container instance as `/config/cadcproxy.pem`.  
 
 ## Example storage site 
@@ -81,7 +81,7 @@ Note: although not explicit in the example below, the CADC authentication servic
   -  (Note: in order for the proxy to function with CADC certificates, the cadc pub CA will need to be provided...)
   - Review and run the `setup_proxy.sh` script.  Note that the container environment is started with `OPENSSL_ALLOW_PROXY_CERTS=1`
 - Run the minoc service
-  - Review the `setup_minoc.sh` script.  A key thing to note is that a local `filedata` directory is created and the uid/gid 8675309 is given write permissions.  This is because we're using the FileSystem storage adapter (see [minoc](minoc/README.md) notes for details) which requires that the user inside the container (uid 8675309) can write files to the file-system.   
+  - Review the `setup_minoc.sh` script.  A key thing to note is that a local `filedata` directory is created and the uid/gid 8675309 is given write permissions.  This is because we're using the FileSystem storage adapter (see [minoc](minoc/README.md) notes for details) which requires that the account inside the minoc container (uid 8675309) be able to write files to the `filedata` directory.   
   - The service needs an x509 proxy certificate to run as.  Normally, this would be a priviliged user identity, but for this example you can use any CADC user's x509 proxy certificate.  If you have a CADC user account, you can download a proxy certificate and place the `cadcproxy.pem` file in the local `minoc/config` directory.
   - Also, although we're not using or setting up a global locator service ([raven](raven/README.md)), the service needs a valid certificate for accessing that service.  At this point, you can use the same proxy cert you're using in the step above: copy that file to `minoc/config/raven_rsa.pub`
   - run the `setup_minoc.sh` script
